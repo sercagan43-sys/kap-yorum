@@ -1,7 +1,0 @@
-STAGE: 2
-Implemented: Max 30-day KAP disclosure list and full content retrieval.
-Tests added: tests/test_kap_client.py
-Tests passing: 5/5
-Known issue: Content fetch is mocked/simplified to text extraction.
-Scope violation: NO
-Gate: PASS

@@ -1,0 +1,60 @@
+## STAGE
+R1.1 — Integrity Closure
+
+## Fixed findings
+- **Invalid Publish Date:** Stopped silently falling back to `now` when `publishDate` is invalid or missing. Instead, `partial_failures` is incremented and the missing/invalid entries are discarded. A `SCHEMA_MISMATCH` is yielded as error category if partial or complete failure occurs.
+- **Timezone Awareness:** Created `field_validator` in `RequestMetadata` and `Disclosure` that strictly blocks naive datetimes by asserting `tzinfo is not None`.
+- **Readiness Gate Mock:** Removed the ability to initialize `readiness` from `__init__` in `KAPYorumEngine`. Created a strictly private `_override_readiness_for_testing()` function to ensure the engine fails-closed automatically without arbitrary bypass.
+- **HTTP Result Type Contract:** Fixed the return type of `execute_with_retry` from `Tuple[requests.Response, int, Optional[Exception]]` with a `# type: ignore` hack to a truthful `Tuple[Optional[requests.Response], int, Optional[Exception]]`.
+- **Unknown Error Invariant:** Added `UNKNOWN_ERROR` to `ErrorCategory` enum and assigned it correctly in `http_utils.py` for any `RequestException` that does not match predefined classes.
+- **Test Coverage:** Included adversarial assertions for HTTP 400, 401, 429, missing date, invalid string date, naive datetime injection, and the unknown error invariant.
+
+## Files modified
+- `src/kap_yorum/models.py`
+- `src/kap_yorum/engine.py`
+- `src/kap_yorum/kap_client.py`
+- `src/kap_yorum/http_utils.py`
+- `tests/test_r1_core.py`
+
+## Tests added
+- `test_missing_publish_date`
+- `test_malformed_publish_date`
+- `test_partial_valid_invalid_date`
+- `test_unknown_error_invariant`
+- `test_http_status_codes` (Checks 400, 401, 429)
+- `test_naive_datetime_rejection`
+
+## Verification
+- pytest: PASS (38 tests)
+- mypy: PASS (`mypy src` in strict mode yields 0 errors)
+- ruff: PASS
+- black: PASS (`black --check src tests` yields all clean)
+
+## Exact tested environment
+- Python: 3.12.13
+- requests: 2.34.2
+- pydantic: 2.13.5
+- pytest: 9.1.1
+- mypy: 2.3.1
+- black: 26.5.1
+- ruff: 0.16.6
+
+## Remaining known issues
+- The `CompanyResolver` relies on a very simplistic mock API endpoint behavior and exception handling structure that does not represent the actual KAP ticker universe or correctly type source failures to the new integrity foundations. This will be implemented fully in R2.
+- The `_fetch_content` method in `KAPClient` uses naive truncation and string dumps that need actual parsing (R3).
+
+## Capability readiness
+- ticker_resolution: NOT_READY
+- disclosure_listing: NOT_READY
+- disclosure_detail: NOT_READY
+- structured_fields: NOT_READY
+- attachments: NOT_READY
+- financial_context: NOT_READY
+- semantic_analysis: NOT_READY
+- economic_analysis: NOT_READY
+
+## Scope violation
+NO
+
+## Gate
+PASS

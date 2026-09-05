@@ -15,10 +15,7 @@ class EconomicAnalyzer:
     """
 
     def analyze(self, disclosure: Disclosure, questions: List[EconomicQuestion]) -> AnalysisResult:
-        result = AnalysisResult(
-            disclosure_id=disclosure.disclosure_index,
-            questions=questions
-        )
+        result = AnalysisResult(disclosure_id=disclosure.disclosure_index, questions=questions)
 
         if disclosure.importance == DisclosureImportance.LOW_ECONOMIC_VALUE:
             # Explicitly state NO_ECONOMIC_VALUE logic from rules
@@ -29,8 +26,12 @@ class EconomicAnalyzer:
 
         # Populate impact based on core and content
         if "sözleşme" in core:
-            result.impact.revenue = "Yeni sözleşme tutarı oranında gelir artışı potansiyeli yaratır."
-            result.impact.profitability = "Sözleşme marjı açıklanmadığı için kesin kârlılık etkisi bilinememektedir."
+            result.impact.revenue = (
+                "Yeni sözleşme tutarı oranında gelir artışı potansiyeli yaratır."
+            )
+            result.impact.profitability = (
+                "Sözleşme marjı açıklanmadığı için kesin kârlılık etkisi bilinememektedir."
+            )
             result.impact.cash_flow = "NOT_APPLICABLE - Ödeme takvimi belli değil."
             result.impact.debt_financing = "NOT_APPLICABLE"
             result.impact.investment_capacity = "NOT_APPLICABLE"
@@ -63,6 +64,6 @@ class EconomicAnalyzer:
             result.impact.risk = "NOT_APPLICABLE"
 
             if "atama" in core:
-                 result.impact.operation = "Yönetimsel değişiklik."
+                result.impact.operation = "Yönetimsel değişiklik."
 
         return result

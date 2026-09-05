@@ -1,7 +1,0 @@
-STAGE: 7
-Implemented: Event relationships, continuations, corrections, contradictions.
-Tests added: tests/test_relationship_analyzer.py
-Tests passing: 4/4
-Known issue: Simplistic heuristics for targeting previous similar events to simulate context engine.
-Scope violation: NO
-Gate: PASS

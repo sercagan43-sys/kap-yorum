@@ -9,6 +9,7 @@ class CompanyResolver:
     """
     Validates BIST tickers and resolves them to company details using KAP API.
     """
+
     KAP_AUTOCOMPLETE_URL = "https://www.kap.org.tr/tr/api/autocomplete"
 
     def __init__(self, http_client: Optional[Any] = None) -> None:
@@ -28,11 +29,11 @@ class CompanyResolver:
             data = response.json()
 
             for item in data:
-                if 'mkkKodu' in item and item['mkkKodu'] == ticker:
+                if "mkkKodu" in item and item["mkkKodu"] == ticker:
                     return Company(
                         ticker=ticker,
-                        name=item.get('unvan', ticker),
-                        member_oid=item.get('memberOid')
+                        name=item.get("unvan", ticker),
+                        member_oid=item.get("memberOid"),
                     )
             return None
         except Exception:

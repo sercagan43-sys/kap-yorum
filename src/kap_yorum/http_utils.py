@@ -39,15 +39,18 @@ class RetryPolicy:
                 if error.response.status_code in (401, 403):
                     return ErrorCategory.AUTH_ERROR
             return ErrorCategory.HTTP_ERROR
-        return ErrorCategory.NONE
+        return ErrorCategory.UNKNOWN_ERROR
 
-def execute_with_retry(http_client: Any, method: str, url: str, **kwargs: Any) -> Tuple[requests.Response, int, Optional[Exception]]:
+
+def execute_with_retry(
+    http_client: Any, method: str, url: str, **kwargs: Any
+) -> Tuple[Optional[requests.Response], int, Optional[Exception]]:
     """
     Executes an HTTP request with a strict retry and timeout policy.
     Returns: (Response object (if any), retry_count, Exception (if failed))
     """
     retries = 0
-    last_exception = None
+    last_exception: Optional[Exception] = None
 
     if "timeout" not in kwargs:
         kwargs["timeout"] = RetryPolicy.TIMEOUT_SEC
@@ -75,4 +78,4 @@ def execute_with_retry(http_client: Any, method: str, url: str, **kwargs: Any) -
             else:
                 break
 
-    return None, retries, last_exception # type: ignore
+    return None, retries, last_exception

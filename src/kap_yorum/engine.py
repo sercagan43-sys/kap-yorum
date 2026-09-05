@@ -16,7 +16,8 @@ class KAPYorumEngine:
     Main orchestration engine ensuring strict adherence to flow, loop prevention,
     and R1 Capability / Readiness boundaries.
     """
-    def __init__(self, http_client: Optional[Any] = None, readiness: Optional[SystemReadiness] = None) -> None:
+
+    def __init__(self, http_client: Optional[Any] = None) -> None:
         self.resolver = CompanyResolver(http_client)
         self.kap_client = KAPClient(http_client)
         self.fact_extractor = FactExtractor()
@@ -28,16 +29,20 @@ class KAPYorumEngine:
 
         # By default, R1 dictates that none of these capabilities are fully READY
         # until the real source integration in R2/R3 is built and verified.
-        self.readiness = readiness or SystemReadiness()
+        self._readiness = SystemReadiness()
+
+    def _override_readiness_for_testing(self, readiness: SystemReadiness) -> None:
+        """Internal method strictly for testing bypasses. Do not use in production."""
+        self._readiness = readiness
 
     def run(self, ticker: str) -> str:
         # FAIL-CLOSED R1 Readiness Gate
-        if not self.readiness.source_layer_validated:
-             return (
-                 "[SİSTEM GÜVENLİK KAPANIŞI] Kaynak ve Veri Bütünlüğü Altyapısı (R1) "
-                 "gerçek kaynak katmanı için henüz hazır değil (SOURCE_LAYER_NOT_VALIDATED). "
-                 "Prototype veya sahte analiz üretimi engellendi."
-             )
+        if not self._readiness.source_layer_validated:
+            return (
+                "[SİSTEM GÜVENLİK KAPANIŞI] Kaynak ve Veri Bütünlüğü Altyapısı (R1) "
+                "gerçek kaynak katmanı için henüz hazır değil (SOURCE_LAYER_NOT_VALIDATED). "
+                "Prototype veya sahte analiz üretimi engellendi."
+            )
 
         # 1. Ticker Validation & Company Resolution
         company = self.resolver.resolve(ticker)
@@ -48,23 +53,25 @@ class KAPYorumEngine:
         disclosures, metadata = self.kap_client.get_disclosures(company, max_days=30)
 
         if metadata.status == SourceStatus.UNAVAILABLE:
-             return f"Erişim Hatası: KAP'a erişim sağlanamadı. (Hata Sınıfı: {metadata.error_category})"
+            return (
+                f"Erişim Hatası: KAP'a erişim sağlanamadı. (Hata Sınıfı: {metadata.error_category})"
+            )
 
         if metadata.status == SourceStatus.INVALID_RESPONSE:
-             return f"Kaynak Hatası: KAP'tan geçersiz veri formatı alındı. (Hata Sınıfı: {metadata.error_category})"
+            return f"Kaynak Hatası: KAP'tan geçersiz veri formatı alındı. (Hata Sınıfı: {metadata.error_category})"
 
         if metadata.status == SourceStatus.EMPTY_CONFIRMED or not disclosures:
-             # Fast-track empty report (Confirmed empty)
-             report = self.report_generator.generate(company.ticker, [], {})
-             return self.report_generator.render_markdown(report)
+            # Fast-track empty report (Confirmed empty)
+            report = self.report_generator.generate(company.ticker, [], {})
+            return self.report_generator.render_markdown(report)
 
         analysis_results = {}
-        processed_indexes = set() # Loop prevention at orchestrator level
+        processed_indexes = set()  # Loop prevention at orchestrator level
 
         # 3. to 6. Iterate and analyze independently (no cross-talk yet)
         for d in disclosures:
             if d.disclosure_index in processed_indexes:
-                 continue
+                continue
             processed_indexes.add(d.disclosure_index)
 
             # Content normalization / Fact extraction
@@ -88,9 +95,9 @@ class KAPYorumEngine:
 
         # Fill overall economic impact if available
         for d in reversed(disclosures):
-             if d.disclosure_index in analysis_results and d.importance in ["CRITICAL", "MATERIAL"]:
-                  res = analysis_results[d.disclosure_index]
-                  report.economic_impact = res.impact
-                  break
+            if d.disclosure_index in analysis_results and d.importance in ["CRITICAL", "MATERIAL"]:
+                res = analysis_results[d.disclosure_index]
+                report.economic_impact = res.impact
+                break
 
         return self.report_generator.render_markdown(report)

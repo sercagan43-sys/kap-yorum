@@ -1,7 +1,0 @@
-STAGE: 1
-Implemented: Ticker validation and company resolution.
-Tests added: tests/test_resolver.py
-Tests passing: 6/6
-Known issue: None
-Scope violation: NO
-Gate: PASS

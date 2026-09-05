@@ -1,27 +1,28 @@
-from kap_yorum.models import Disclosure, DisclosureImportance, QuestionStatus
+from kap_yorum.models import Disclosure, DisclosureImportance, QuestionStatus, get_now_tz
 from kap_yorum.question_generator import QuestionGenerator
 
 
 def test_no_questions_for_low_value():
     d = Disclosure(
         disclosure_index="1",
-        publish_date="2023-01-01",
+        publish_date=get_now_tz(),
         title="Test",
-        importance=DisclosureImportance.LOW_ECONOMIC_VALUE
+        importance=DisclosureImportance.LOW_ECONOMIC_VALUE,
     )
     generator = QuestionGenerator()
     questions = generator.generate_and_resolve(d)
     assert len(questions) == 0
 
+
 def test_contract_questions_resolution():
     d = Disclosure(
         disclosure_index="2",
-        publish_date="2023-01-01",
+        publish_date=get_now_tz(),
         title="Test",
         content="100 milyon TL sözleşme imzalanmıştır.",
         importance=DisclosureImportance.CRITICAL,
         semantic_core="Yeni iş bağlantısı/sözleşme",
-        verified_facts=["Tutar bilgisi mevcut", "Sözleşme imzalandı"]
+        verified_facts=["Tutar bilgisi mevcut", "Sözleşme imzalandı"],
     )
     generator = QuestionGenerator()
     questions = generator.generate_and_resolve(d)
@@ -41,13 +42,14 @@ def test_contract_questions_resolution():
     assert q_kar.status == QuestionStatus.INSUFFICIENT_PUBLIC_INFORMATION
     assert q_kar.reason is not None
 
+
 def test_missing_reason_safety_catch():
     d = Disclosure(
         disclosure_index="3",
-        publish_date="2023-01-01",
+        publish_date=get_now_tz(),
         title="Test",
         importance=DisclosureImportance.MATERIAL,
-        semantic_core="Bilinmeyen tür"
+        semantic_core="Bilinmeyen tür",
     )
     generator = QuestionGenerator()
     questions = generator.generate_and_resolve(d)
@@ -57,14 +59,15 @@ def test_missing_reason_safety_catch():
     assert questions[0].status == QuestionStatus.INSUFFICIENT_PUBLIC_INFORMATION
     assert questions[0].reason is not None
 
+
 def test_not_applicable_resolution():
     d = Disclosure(
         disclosure_index="4",
-        publish_date="2023-01-01",
+        publish_date=get_now_tz(),
         title="Test",
         content="Sözleşme görüşmeleri devam ediyor.",
         importance=DisclosureImportance.CRITICAL,
-        semantic_core="Yeni iş bağlantısı/sözleşme"
+        semantic_core="Yeni iş bağlantısı/sözleşme",
     )
     generator = QuestionGenerator()
     questions = generator.generate_and_resolve(d)

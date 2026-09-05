@@ -1,11 +1,10 @@
-from datetime import datetime
-
 from kap_yorum.models import (
     AnalysisResult,
     Disclosure,
     DisclosureImportance,
     EconomicQuestion,
     QuestionStatus,
+    get_now_tz,
 )
 from kap_yorum.report_generator import ReportGenerator
 
@@ -19,26 +18,25 @@ def test_generate_empty():
     assert "bulunamadı" in md
     assert "Kapsam" not in md
 
+
 def test_generate_full():
     d = Disclosure(
         disclosure_index="1",
-        publish_date=datetime.now(),
+        publish_date=get_now_tz(),
         title="Test",
         importance=DisclosureImportance.CRITICAL,
         semantic_core="Test Core",
-        real_value_point="Test Value"
+        real_value_point="Test Value",
     )
 
     res = AnalysisResult(
         disclosure_id="1",
         questions=[
             EconomicQuestion(
-                question="Why?",
-                status=QuestionStatus.INSUFFICIENT_PUBLIC_INFORMATION,
-                reason="Sır"
+                question="Why?", status=QuestionStatus.INSUFFICIENT_PUBLIC_INFORMATION, reason="Sır"
             )
         ],
-        contradictions=["Risk 1"]
+        contradictions=["Risk 1"],
     )
 
     generator = ReportGenerator()

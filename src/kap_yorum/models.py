@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class SourceStatus(str, Enum):
@@ -11,6 +11,7 @@ class SourceStatus(str, Enum):
     PARTIAL = "PARTIAL"
     UNAVAILABLE = "UNAVAILABLE"
     INVALID_RESPONSE = "INVALID_RESPONSE"
+
 
 class ErrorCategory(str, Enum):
     TIMEOUT = "TIMEOUT"
@@ -22,7 +23,9 @@ class ErrorCategory(str, Enum):
     RATE_LIMIT = "RATE_LIMIT"
     PARTIAL_CHILD_FAILURE = "PARTIAL_CHILD_FAILURE"
     INVALID_IDENTIFIER = "INVALID_IDENTIFIER"
+    UNKNOWN_ERROR = "UNKNOWN_ERROR"
     NONE = "NONE"
+
 
 class RequestMetadata(BaseModel):
     source_name: str
@@ -36,9 +39,17 @@ class RequestMetadata(BaseModel):
     retry_count: int = 0
     raw_error_message: Optional[str] = None
 
+    @field_validator("start_time")
+    def validate_timezone(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            raise ValueError("datetime must be timezone-aware")
+        return v
+
+
 class CapabilityStatus(str, Enum):
     READY = "READY"
     NOT_READY = "NOT_READY"
+
 
 class SystemReadiness(BaseModel):
     ticker_resolution: CapabilityStatus = CapabilityStatus.NOT_READY
@@ -53,14 +64,16 @@ class SystemReadiness(BaseModel):
     @property
     def source_layer_validated(self) -> bool:
         return (
-            self.ticker_resolution == CapabilityStatus.READY and
-            self.disclosure_listing == CapabilityStatus.READY and
-            self.disclosure_detail == CapabilityStatus.READY
+            self.ticker_resolution == CapabilityStatus.READY
+            and self.disclosure_listing == CapabilityStatus.READY
+            and self.disclosure_detail == CapabilityStatus.READY
         )
+
 
 # Timezone-aware date generator
 def get_now_tz() -> datetime:
     return datetime.now(timezone.utc)
+
 
 # Identity contract
 class DisclosureIdentity(BaseModel):
@@ -70,8 +83,10 @@ class DisclosureIdentity(BaseModel):
     def validate_id(self) -> bool:
         return bool(self.canonical_id and self.canonical_id.strip())
 
+
 class DisclosureIdentityError(Exception):
     pass
+
 
 # We redefine or augment the previous models to ensure timezone awareness
 class QuestionStatus(str, Enum):
@@ -80,19 +95,22 @@ class QuestionStatus(str, Enum):
     NO_ECONOMIC_VALUE = "NO_ECONOMIC_VALUE"
     INSUFFICIENT_PUBLIC_INFORMATION = "INSUFFICIENT_PUBLIC_INFORMATION"
 
+
 class DisclosureImportance(str, Enum):
     CRITICAL = "CRITICAL"
     MATERIAL = "MATERIAL"
     LOW_ECONOMIC_VALUE = "LOW_ECONOMIC_VALUE"
+
 
 class Company(BaseModel):
     ticker: str
     name: str
     member_oid: Optional[str] = None
 
+
 class Disclosure(BaseModel):
     disclosure_index: str
-    publish_date: datetime # Must be tz-aware
+    publish_date: datetime  # Must be tz-aware
     title: str
     content: Optional[str] = None
     url: Optional[str] = None
@@ -103,11 +121,19 @@ class Disclosure(BaseModel):
     semantic_core: Optional[str] = None
     real_value_point: Optional[str] = None
 
+    @field_validator("publish_date")
+    def validate_timezone(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            raise ValueError("datetime must be timezone-aware")
+        return v
+
+
 class EconomicQuestion(BaseModel):
     question: str
     status: QuestionStatus
     answer: Optional[str] = None
     reason: Optional[str] = None
+
 
 class EconomicImpact(BaseModel):
     revenue: Optional[str] = None
@@ -118,12 +144,14 @@ class EconomicImpact(BaseModel):
     operation: Optional[str] = None
     risk: Optional[str] = None
 
+
 class AnalysisResult(BaseModel):
     disclosure_id: str
     questions: List[EconomicQuestion] = Field(default_factory=list)
     impact: EconomicImpact = Field(default_factory=EconomicImpact)
     contradictions: List[str] = Field(default_factory=list)
     related_disclosures: List[str] = Field(default_factory=list)
+
 
 class FinalReport(BaseModel):
     ticker: str

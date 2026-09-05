@@ -34,12 +34,12 @@ class RequestMetadata(BaseModel):
     source_name: str
     operation_name: str
     start_time: datetime
-    duration_ms: int = 0
+    duration_ms: int = Field(default=0, ge=0)
     status: SourceStatus
-    records_fetched: int = 0
-    records_failed: int = 0
+    records_fetched: int = Field(default=0, ge=0)
+    records_failed: int = Field(default=0, ge=0)
     error_category: ErrorCategory = ErrorCategory.NONE
-    retry_count: int = 0
+    retry_count: int = Field(default=0, ge=0)
     raw_error_message: Optional[str] = None
 
     @field_validator("start_time")
@@ -53,15 +53,31 @@ class RequestMetadata(BaseModel):
         status = self.status
         error_category = self.error_category
 
-        if status in (SourceStatus.SUCCESS, SourceStatus.EMPTY_CONFIRMED):
+        if status == SourceStatus.SUCCESS:
             if error_category != ErrorCategory.NONE:
                 raise ValueError(f"Status {status} must have ErrorCategory.NONE")
+            if self.records_failed > 0:
+                raise ValueError(f"Status {status} cannot have failed records")
+
+        elif status == SourceStatus.EMPTY_CONFIRMED:
+            if error_category != ErrorCategory.NONE:
+                raise ValueError(f"Status {status} must have ErrorCategory.NONE")
+            if self.records_fetched > 0:
+                raise ValueError(f"Status {status} cannot have fetched records")
+            if self.records_failed > 0:
+                raise ValueError(f"Status {status} cannot have failed records")
+
         elif status in (SourceStatus.UNAVAILABLE, SourceStatus.INVALID_RESPONSE):
             if error_category == ErrorCategory.NONE:
                 raise ValueError(f"Status {status} cannot have ErrorCategory.NONE")
+
         elif status == SourceStatus.PARTIAL:
-            if self.records_failed > 0 and error_category == ErrorCategory.NONE:
-                raise ValueError(f"Status PARTIAL with failed records cannot have ErrorCategory.NONE")
+            if self.records_fetched == 0:
+                raise ValueError(f"Status PARTIAL must have > 0 fetched records")
+            if self.records_failed == 0:
+                raise ValueError(f"Status PARTIAL must have > 0 failed records")
+            if error_category == ErrorCategory.NONE:
+                raise ValueError(f"Status PARTIAL must not have ErrorCategory.NONE")
 
         return self
 

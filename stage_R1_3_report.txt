@@ -1,0 +1,65 @@
+## STAGE
+R1.3 — State Machine Seal
+
+## Changes
+- Removed the mutable readiness state mapping from `_readiness` inside the production engine completely. The engine now operates via a strictly sealed `_is_production_ready` property that returns `False` deterministically in production environments, thereby perfectly sealing the test overrides from runtime manipulations.
+- Enforced strict integer boundary validations on counters inside `RequestMetadata` (`records_fetched >= 0`, `records_failed >= 0`, `duration_ms >= 0`, `retry_count >= 0`) via explicit `Field` bounds.
+- Augmented the `RequestMetadata` model validator to strictly forbid invalid combinations of states (e.g. failing a `PARTIAL` result that doesn't actually contain fetched records, preventing `EMPTY_CONFIRMED` or `SUCCESS` states that register failures or errors).
+
+## State invariants
+### SUCCESS
+- `error_category == NONE`
+- `records_failed == 0`
+### EMPTY_CONFIRMED
+- `error_category == NONE`
+- `records_fetched == 0`
+- `records_failed == 0`
+### PARTIAL
+- `records_fetched > 0`
+- `records_failed > 0`
+- `error_category != NONE`
+### UNAVAILABLE
+- `error_category != NONE`
+### INVALID_RESPONSE
+- `error_category != NONE`
+### Counters
+- `records_fetched >= 0`
+- `records_failed >= 0`
+- `retry_count >= 0`
+- `duration_ms >= 0`
+
+## Tests added
+- `test_metadata_invariant_success_with_failed_records`
+- `test_metadata_invariant_empty_with_fetched_records`
+- `test_metadata_invariant_empty_with_failed_records`
+- `test_metadata_invariant_partial_zero_fetched`
+- `test_metadata_invariant_partial_zero_failed`
+- `test_metadata_invariant_partial_none_error`
+- `test_metadata_invariant_negative_counters`
+- `test_production_readiness_manual_bypass_attempt`
+
+## Verification
+* pytest: PASS (53 tests)
+* mypy: PASS (strictly clean on src/)
+* ruff: PASS
+* black: PASS
+
+## Capability readiness
+* ticker_resolution: NOT_READY
+* disclosure_listing: NOT_READY
+* disclosure_detail: NOT_READY
+* structured_fields: NOT_READY
+* attachments: NOT_READY
+* financial_context: NOT_READY
+* semantic_analysis: NOT_READY
+* economic_analysis: NOT_READY
+
+## Remaining known issues
+- The `CompanyResolver` relies on a very simplistic mock API endpoint behavior and exception handling structure that does not represent the actual KAP ticker universe or correctly type source failures to the new integrity foundations. Deferred to R2.
+- The `_fetch_content` method in `KAPClient` uses naive truncation and string dumps that need actual HTML parsing. Deferred to R3.
+
+## Scope violation
+NO
+
+## Gate
+PASS

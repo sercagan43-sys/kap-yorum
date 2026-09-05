@@ -31,9 +31,16 @@ class KAPYorumEngine:
         # until the real source integration in R2/R3 is built and verified.
         self._readiness = SystemReadiness()
 
+    @property
+    def _is_production_ready(self) -> bool:
+        # In R1, we strictly return False to seal the state machine for production.
+        # This completely ignores external mutation of self._readiness.
+        # Test frameworks can override this property specifically, rather than mutating state.
+        return False
+
     def run(self, ticker: str) -> str:
         # FAIL-CLOSED R1 Readiness Gate
-        if not self._readiness.source_layer_validated:
+        if not self._is_production_ready:
             return (
                 "[SİSTEM GÜVENLİK KAPANIŞI] Kaynak ve Veri Bütünlüğü Altyapısı (R1) "
                 "gerçek kaynak katmanı için henüz hazır değil (SOURCE_LAYER_NOT_VALIDATED). "

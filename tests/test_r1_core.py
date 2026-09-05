@@ -61,20 +61,15 @@ def test_engine_fail_closed_readiness():
 
 def test_engine_readiness_override():
     class TestEngine(KAPYorumEngine):
-        def set_readiness(self, r: SystemReadiness) -> None:
-            self._readiness = r
+        @property
+        def _is_production_ready(self) -> bool:
+            return True
 
-    readiness = SystemReadiness(
-        ticker_resolution=CapabilityStatus.READY,
-        disclosure_listing=CapabilityStatus.READY,
-        disclosure_detail=CapabilityStatus.READY,
-    )
     engine = TestEngine(
         http_client=MockHttpClient(
             get_data=[{"mkkKodu": "ASELS", "unvan": "ASELSAN", "memberOid": "123"}]
         )
     )
-    engine.set_readiness(readiness)
     res = engine.run("ASELS")
     # Because client data mock is simplistic in engine integration, it might return empty confirmed
     assert "SİSTEM GÜVENLİK KAPANIŞI" not in res
@@ -83,7 +78,14 @@ def test_engine_readiness_override():
 
 def test_production_readiness_manual_bypass_attempt():
     engine = KAPYorumEngine(http_client=MockHttpClient())
+    # Attacking the engine's internal readiness state
+    engine._readiness = SystemReadiness(
+        ticker_resolution=CapabilityStatus.READY,
+        disclosure_listing=CapabilityStatus.READY,
+        disclosure_detail=CapabilityStatus.READY,
+    )
     res = engine.run("ASELS")
+    # It must STILL fail closed
     assert "SİSTEM GÜVENLİK KAPANIŞI" in res
 
 
@@ -241,6 +243,159 @@ def test_metadata_invariant_invalid_response_with_none():
             start_time=now,
             status=SourceStatus.INVALID_RESPONSE,
             error_category=ErrorCategory.NONE,
+        )
+
+
+def test_metadata_invariant_success_with_failed_records():
+    import pytest
+
+    from kap_yorum.models import RequestMetadata
+
+    now = get_now_tz()
+
+    with pytest.raises(ValueError, match="cannot have failed records"):
+        RequestMetadata(
+            source_name="Test",
+            operation_name="Test",
+            start_time=now,
+            status=SourceStatus.SUCCESS,
+            records_failed=1,
+        )
+
+
+def test_metadata_invariant_empty_with_fetched_records():
+    import pytest
+
+    from kap_yorum.models import RequestMetadata
+
+    now = get_now_tz()
+
+    with pytest.raises(ValueError, match="cannot have fetched records"):
+        RequestMetadata(
+            source_name="Test",
+            operation_name="Test",
+            start_time=now,
+            status=SourceStatus.EMPTY_CONFIRMED,
+            records_fetched=1,
+        )
+
+
+def test_metadata_invariant_empty_with_failed_records():
+    import pytest
+
+    from kap_yorum.models import RequestMetadata
+
+    now = get_now_tz()
+
+    with pytest.raises(ValueError, match="cannot have failed records"):
+        RequestMetadata(
+            source_name="Test",
+            operation_name="Test",
+            start_time=now,
+            status=SourceStatus.EMPTY_CONFIRMED,
+            records_failed=1,
+        )
+
+
+def test_metadata_invariant_partial_zero_fetched():
+    import pytest
+
+    from kap_yorum.models import RequestMetadata
+
+    now = get_now_tz()
+
+    with pytest.raises(ValueError, match="must have > 0 fetched records"):
+        RequestMetadata(
+            source_name="Test",
+            operation_name="Test",
+            start_time=now,
+            status=SourceStatus.PARTIAL,
+            records_fetched=0,
+            records_failed=1,
+            error_category=ErrorCategory.SCHEMA_MISMATCH,
+        )
+
+
+def test_metadata_invariant_partial_zero_failed():
+    import pytest
+
+    from kap_yorum.models import RequestMetadata
+
+    now = get_now_tz()
+
+    with pytest.raises(ValueError, match="must have > 0 failed records"):
+        RequestMetadata(
+            source_name="Test",
+            operation_name="Test",
+            start_time=now,
+            status=SourceStatus.PARTIAL,
+            records_fetched=1,
+            records_failed=0,
+            error_category=ErrorCategory.SCHEMA_MISMATCH,
+        )
+
+
+def test_metadata_invariant_partial_none_error():
+    import pytest
+
+    from kap_yorum.models import RequestMetadata
+
+    now = get_now_tz()
+
+    with pytest.raises(ValueError, match="must not have ErrorCategory.NONE"):
+        RequestMetadata(
+            source_name="Test",
+            operation_name="Test",
+            start_time=now,
+            status=SourceStatus.PARTIAL,
+            records_fetched=1,
+            records_failed=1,
+            error_category=ErrorCategory.NONE,
+        )
+
+
+def test_metadata_invariant_negative_counters():
+    import pytest
+    from pydantic import ValidationError
+
+    from kap_yorum.models import RequestMetadata
+
+    now = get_now_tz()
+
+    with pytest.raises(ValidationError):
+        RequestMetadata(
+            source_name="Test",
+            operation_name="Test",
+            start_time=now,
+            status=SourceStatus.SUCCESS,
+            records_fetched=-1,
+        )
+
+    with pytest.raises(ValidationError):
+        RequestMetadata(
+            source_name="Test",
+            operation_name="Test",
+            start_time=now,
+            status=SourceStatus.SUCCESS,
+            records_failed=-1,
+        )
+
+    with pytest.raises(ValidationError):
+        RequestMetadata(
+            source_name="Test",
+            operation_name="Test",
+            start_time=now,
+            status=SourceStatus.SUCCESS,
+            retry_count=-1,
+        )
+
+    with pytest.raises(ValidationError):
+        RequestMetadata(
+            source_name="Test",
+            operation_name="Test",
+            start_time=now,
+            status=SourceStatus.SUCCESS,
+            duration_ms=-1,
         )
 
 

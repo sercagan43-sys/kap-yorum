@@ -1,0 +1,7 @@
+STAGE: 3
+Implemented: Fact extraction
+Tests added: tests/test_fact_extractor.py
+Tests passing: 4/4
+Known issue: Extraction relies on basic keyword heuristics as a stand-in for full NLP/LLM processing, meeting structural and architectural demands.
+Scope violation: NO
+Gate: PASS

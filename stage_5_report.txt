@@ -1,0 +1,7 @@
+STAGE: 5
+Implemented: Economic question generation and controlled resolution
+Tests added: tests/test_question_generator.py
+Tests passing: 4/4
+Known issue: Question set is heuristic based on semantic core keywords, simulating AI behavior while strictly adhering to architectural closure rules (no unanswered questions).
+Scope violation: NO
+Gate: PASS

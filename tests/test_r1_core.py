@@ -60,21 +60,31 @@ def test_engine_fail_closed_readiness():
 
 
 def test_engine_readiness_override():
+    class TestEngine(KAPYorumEngine):
+        def set_readiness(self, r: SystemReadiness) -> None:
+            self._readiness = r
+
     readiness = SystemReadiness(
         ticker_resolution=CapabilityStatus.READY,
         disclosure_listing=CapabilityStatus.READY,
         disclosure_detail=CapabilityStatus.READY,
     )
-    engine = KAPYorumEngine(
+    engine = TestEngine(
         http_client=MockHttpClient(
             get_data=[{"mkkKodu": "ASELS", "unvan": "ASELSAN", "memberOid": "123"}]
         )
     )
-    engine._override_readiness_for_testing(readiness)
+    engine.set_readiness(readiness)
     res = engine.run("ASELS")
     # Because client data mock is simplistic in engine integration, it might return empty confirmed
     assert "SİSTEM GÜVENLİK KAPANIŞI" not in res
     assert "Son 30 günlük dönemde KAP açıklaması bulunamadı" in res
+
+
+def test_production_readiness_manual_bypass_attempt():
+    engine = KAPYorumEngine(http_client=MockHttpClient())
+    res = engine.run("ASELS")
+    assert "SİSTEM GÜVENLİK KAPANIŞI" in res
 
 
 # --- Client State & Error Taxonomy Tests ---
@@ -145,9 +155,93 @@ def test_kap_client_identity_deduplication():
 
     discs, metadata = client.get_disclosures(company)
     assert metadata.status == SourceStatus.PARTIAL
-    assert metadata.error_category == ErrorCategory.SCHEMA_MISMATCH
+    assert metadata.error_category == ErrorCategory.DUPLICATE_IDENTIFIER
     assert metadata.records_fetched == 1
     assert metadata.records_failed == 1
+
+
+def test_kap_client_missing_canonical_id():
+    now_ms = int(get_now_tz().timestamp() * 1000)
+    data = [
+        {"disclosureIndex": "123", "publishDate": now_ms, "title": "Test 1"},
+        {"disclosureIndex": "", "publishDate": now_ms, "title": "Missing ID"},
+    ]
+    client = KAPClient(http_client=MockHttpClient(post_data=data))
+    company = Company(ticker="ASELS", name="A", member_oid="1")
+
+    discs, metadata = client.get_disclosures(company)
+    assert metadata.status == SourceStatus.PARTIAL
+    assert metadata.error_category == ErrorCategory.MISSING_IDENTIFIER
+    assert metadata.records_fetched == 1
+    assert metadata.records_failed == 1
+
+
+def test_kap_client_multiple_errors_batch():
+    now_ms = int(get_now_tz().timestamp() * 1000)
+    data = [
+        {"disclosureIndex": "123", "publishDate": now_ms, "title": "Test 1"},
+        {"disclosureIndex": "123", "publishDate": now_ms, "title": "Duplicate"},
+        {"disclosureIndex": "124", "publishDate": "not-a-date", "title": "Invalid Date"},
+    ]
+    client = KAPClient(http_client=MockHttpClient(post_data=data))
+    company = Company(ticker="ASELS", name="A", member_oid="1")
+
+    discs, metadata = client.get_disclosures(company)
+    assert metadata.status == SourceStatus.PARTIAL
+    assert metadata.error_category == ErrorCategory.MULTIPLE_ERRORS
+    assert metadata.records_fetched == 1
+    assert metadata.records_failed == 2
+
+
+def test_metadata_invariant_success_with_error():
+    import pytest
+
+    from kap_yorum.models import RequestMetadata
+
+    now = get_now_tz()
+
+    with pytest.raises(ValueError, match="must have ErrorCategory.NONE"):
+        RequestMetadata(
+            source_name="Test",
+            operation_name="Test",
+            start_time=now,
+            status=SourceStatus.SUCCESS,
+            error_category=ErrorCategory.HTTP_ERROR,
+        )
+
+
+def test_metadata_invariant_unavailable_with_none():
+    import pytest
+
+    from kap_yorum.models import RequestMetadata
+
+    now = get_now_tz()
+
+    with pytest.raises(ValueError, match="cannot have ErrorCategory.NONE"):
+        RequestMetadata(
+            source_name="Test",
+            operation_name="Test",
+            start_time=now,
+            status=SourceStatus.UNAVAILABLE,
+            error_category=ErrorCategory.NONE,
+        )
+
+
+def test_metadata_invariant_invalid_response_with_none():
+    import pytest
+
+    from kap_yorum.models import RequestMetadata
+
+    now = get_now_tz()
+
+    with pytest.raises(ValueError, match="cannot have ErrorCategory.NONE"):
+        RequestMetadata(
+            source_name="Test",
+            operation_name="Test",
+            start_time=now,
+            status=SourceStatus.INVALID_RESPONSE,
+            error_category=ErrorCategory.NONE,
+        )
 
 
 def test_temporal_timezone_awareness():
@@ -218,14 +312,20 @@ def test_http_status_codes():
 
     # 400 Bad Request -> HTTP_ERROR
     class HTTP400Client:
+        def __init__(self):
+            self.calls = 0
+
         def post(self, url, **kwargs):
+            self.calls += 1
             resp = requests.Response()
             resp.status_code = 400
             raise requests.exceptions.HTTPError(response=resp)
 
-    client = KAPClient(http_client=HTTP400Client())
+    mock400 = HTTP400Client()
+    client = KAPClient(http_client=mock400)
     _, metadata = client.get_disclosures(company)
     assert metadata.error_category == ErrorCategory.HTTP_ERROR
+    assert mock400.calls == 1  # 400 is not retryable
 
     # 401 Unauthorized -> AUTH_ERROR
     class HTTP401Client:
@@ -250,14 +350,20 @@ def test_http_status_codes():
     assert metadata.error_category == ErrorCategory.RATE_LIMIT
 
     class HTTP500Client:
+        def __init__(self):
+            self.calls = 0
+
         def post(self, url, **kwargs):
+            self.calls += 1
             resp = requests.Response()
             resp.status_code = 500
             raise requests.exceptions.HTTPError(response=resp)
 
-    client = KAPClient(http_client=HTTP500Client())
+    mock500 = HTTP500Client()
+    client = KAPClient(http_client=mock500)
     _, metadata = client.get_disclosures(company)
     assert metadata.error_category == ErrorCategory.HTTP_ERROR
+    assert mock500.calls == 3  # 1 initial + 2 retries
 
 
 def test_malformed_json_response():
@@ -286,7 +392,7 @@ def test_naive_datetime_rejection():
 
     import pytest
 
-    from kap_yorum.models import RequestMetadata
+    from kap_yorum.models import Disclosure, DisclosureImportance, RequestMetadata
 
     # naive datetime
     naive_dt = datetime(2025, 1, 1, 12, 0)
@@ -297,3 +403,30 @@ def test_naive_datetime_rejection():
             start_time=naive_dt,
             status=SourceStatus.SUCCESS,
         )
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        Disclosure(
+            disclosure_index="123",
+            publish_date=naive_dt,
+            title="Test",
+            importance=DisclosureImportance.CRITICAL,
+        )
+
+
+def test_conflicting_identity_behavior():
+    now_ms = int(get_now_tz().timestamp() * 1000)
+    # Different titles, but same canonical ID (disclosureIndex)
+    data = [
+        {"disclosureIndex": "123", "publishDate": now_ms, "title": "First Version"},
+        {"disclosureIndex": "123", "publishDate": now_ms, "title": "Second Version"},
+    ]
+    client = KAPClient(http_client=MockHttpClient(post_data=data))
+    company = Company(ticker="ASELS", name="A", member_oid="1")
+
+    discs, metadata = client.get_disclosures(company)
+    assert metadata.status == SourceStatus.PARTIAL
+    assert metadata.error_category == ErrorCategory.DUPLICATE_IDENTIFIER
+    assert metadata.records_fetched == 1
+    assert metadata.records_failed == 1
+    # Check that it kept the first one and rejected the conflicting identity
+    assert discs[0].title == "First Version"

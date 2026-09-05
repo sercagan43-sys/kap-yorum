@@ -31,10 +31,6 @@ class KAPYorumEngine:
         # until the real source integration in R2/R3 is built and verified.
         self._readiness = SystemReadiness()
 
-    def _override_readiness_for_testing(self, readiness: SystemReadiness) -> None:
-        """Internal method strictly for testing bypasses. Do not use in production."""
-        self._readiness = readiness
-
     def run(self, ticker: str) -> str:
         # FAIL-CLOSED R1 Readiness Gate
         if not self._readiness.source_layer_validated:

@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional
+from typing import Any, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class SourceStatus(str, Enum):
@@ -24,6 +24,9 @@ class ErrorCategory(str, Enum):
     PARTIAL_CHILD_FAILURE = "PARTIAL_CHILD_FAILURE"
     INVALID_IDENTIFIER = "INVALID_IDENTIFIER"
     UNKNOWN_ERROR = "UNKNOWN_ERROR"
+    DUPLICATE_IDENTIFIER = "DUPLICATE_IDENTIFIER"
+    MISSING_IDENTIFIER = "MISSING_IDENTIFIER"
+    MULTIPLE_ERRORS = "MULTIPLE_ERRORS"
     NONE = "NONE"
 
 
@@ -41,9 +44,26 @@ class RequestMetadata(BaseModel):
 
     @field_validator("start_time")
     def validate_timezone(cls, v: datetime) -> datetime:
-        if v.tzinfo is None:
+        if v.tzinfo is None or v.tzinfo.utcoffset(v) is None:
             raise ValueError("datetime must be timezone-aware")
         return v
+
+    @model_validator(mode="after")
+    def validate_error_category_invariant(self) -> "RequestMetadata":
+        status = self.status
+        error_category = self.error_category
+
+        if status in (SourceStatus.SUCCESS, SourceStatus.EMPTY_CONFIRMED):
+            if error_category != ErrorCategory.NONE:
+                raise ValueError(f"Status {status} must have ErrorCategory.NONE")
+        elif status in (SourceStatus.UNAVAILABLE, SourceStatus.INVALID_RESPONSE):
+            if error_category == ErrorCategory.NONE:
+                raise ValueError(f"Status {status} cannot have ErrorCategory.NONE")
+        elif status == SourceStatus.PARTIAL:
+            if self.records_failed > 0 and error_category == ErrorCategory.NONE:
+                raise ValueError(f"Status PARTIAL with failed records cannot have ErrorCategory.NONE")
+
+        return self
 
 
 class CapabilityStatus(str, Enum):
@@ -123,7 +143,7 @@ class Disclosure(BaseModel):
 
     @field_validator("publish_date")
     def validate_timezone(cls, v: datetime) -> datetime:
-        if v.tzinfo is None:
+        if v.tzinfo is None or v.tzinfo.utcoffset(v) is None:
             raise ValueError("datetime must be timezone-aware")
         return v
 

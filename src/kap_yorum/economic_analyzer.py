@@ -1,5 +1,12 @@
 from typing import List
-from kap_yorum.models import Disclosure, DisclosureImportance, EconomicImpact, AnalysisResult, EconomicQuestion
+
+from kap_yorum.models import (
+    AnalysisResult,
+    Disclosure,
+    DisclosureImportance,
+    EconomicQuestion,
+)
+
 
 class EconomicAnalyzer:
     """

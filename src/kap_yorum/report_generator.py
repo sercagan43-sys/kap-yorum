@@ -1,5 +1,12 @@
-from typing import List, Dict
-from kap_yorum.models import Disclosure, DisclosureImportance, AnalysisResult, FinalReport, EconomicQuestion
+from typing import Dict, List
+
+from kap_yorum.models import (
+    AnalysisResult,
+    Disclosure,
+    DisclosureImportance,
+    FinalReport,
+)
+
 
 class ReportGenerator:
     """

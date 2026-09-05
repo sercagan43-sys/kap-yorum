@@ -1,7 +1,8 @@
-import pytest
 from datetime import datetime
+
 from kap_yorum.models import Disclosure, DisclosureImportance
 from kap_yorum.semantic_interpreter import SemanticInterpreter
+
 
 def test_semantic_interpreter_contract():
     d = Disclosure(

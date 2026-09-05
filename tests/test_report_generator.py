@@ -1,7 +1,14 @@
-import pytest
 from datetime import datetime
-from kap_yorum.models import Disclosure, DisclosureImportance, AnalysisResult, EconomicQuestion, QuestionStatus
+
+from kap_yorum.models import (
+    AnalysisResult,
+    Disclosure,
+    DisclosureImportance,
+    EconomicQuestion,
+    QuestionStatus,
+)
 from kap_yorum.report_generator import ReportGenerator
+
 
 def test_generate_empty():
     generator = ReportGenerator()

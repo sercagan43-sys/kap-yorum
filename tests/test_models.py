@@ -1,5 +1,5 @@
-import pytest
-from kap_yorum.models import QuestionStatus, DisclosureImportance, Company, Disclosure
+from kap_yorum.models import Company, DisclosureImportance, QuestionStatus
+
 
 def test_models():
     company = Company(ticker="ASELS", name="Aselsan")

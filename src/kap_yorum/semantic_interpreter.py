@@ -1,5 +1,6 @@
 from kap_yorum.models import Disclosure, DisclosureImportance
 
+
 class SemanticInterpreter:
     """
     Extracts the 'semantic core' (What is this really about?) and

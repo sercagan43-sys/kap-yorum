@@ -1,7 +1,8 @@
-import pytest
 from datetime import datetime
-from kap_yorum.models import Disclosure
+
 from kap_yorum.fact_extractor import FactExtractor
+from kap_yorum.models import Disclosure
+
 
 def test_extract_facts_basic():
     d = Disclosure(

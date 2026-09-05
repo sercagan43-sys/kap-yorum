@@ -1,5 +1,5 @@
-from typing import List
 from kap_yorum.models import Disclosure
+
 
 class FactExtractor:
     """

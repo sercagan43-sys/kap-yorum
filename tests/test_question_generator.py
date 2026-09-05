@@ -1,6 +1,6 @@
-import pytest
 from kap_yorum.models import Disclosure, DisclosureImportance, QuestionStatus
 from kap_yorum.question_generator import QuestionGenerator
+
 
 def test_no_questions_for_low_value():
     d = Disclosure(

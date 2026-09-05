@@ -1,5 +1,7 @@
-from typing import List, Dict
-from kap_yorum.models import Disclosure, DisclosureImportance, AnalysisResult
+from typing import Dict, List
+
+from kap_yorum.models import AnalysisResult, Disclosure, DisclosureImportance
+
 
 class EventRelationshipAnalyzer:
     """

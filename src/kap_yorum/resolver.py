@@ -1,6 +1,9 @@
+from typing import Any, Optional
+
 import requests
-from typing import Optional
+
 from kap_yorum.models import Company
+
 
 class CompanyResolver:
     """
@@ -8,7 +11,7 @@ class CompanyResolver:
     """
     KAP_AUTOCOMPLETE_URL = "https://www.kap.org.tr/tr/api/autocomplete"
 
-    def __init__(self, http_client=None):
+    def __init__(self, http_client: Optional[Any] = None) -> None:
         self.http_client = http_client or requests
 
     def resolve(self, ticker: str) -> Optional[Company]:

@@ -1,7 +1,8 @@
-import pytest
 from datetime import datetime, timedelta
-from kap_yorum.models import Disclosure, DisclosureImportance, AnalysisResult
+
+from kap_yorum.models import AnalysisResult, Disclosure, DisclosureImportance
 from kap_yorum.relationship_analyzer import EventRelationshipAnalyzer
+
 
 def test_relationship_correction():
     now = datetime.now()

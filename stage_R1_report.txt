@@ -1,0 +1,80 @@
+## STAGE
+R1 — Source & Data Integrity Foundation
+
+## Starting audit
+The previous implementation (Stages 0-9) successfully established the architecture but relied heavily on mocked or simplistic logic to demonstrate capability without breaking constraints. Identified heuristics and placeholders include:
+- `kap_client.py`: Very basic string-to-datetime heuristic fallback and simplistic HTML content truncation (`text[:1000]`).
+- `fact_extractor.py`: Simplistic keyword matching (e.g. `sözleşme imzalanmıştır`) to extract facts.
+- `semantic_interpreter.py`: Keyword-based semantic core assignment.
+- `question_generator.py`: Hardcoded sets of questions mapped strictly to the semantic cores.
+- `economic_analyzer.py`: Hardcoded strings for impacts depending on semantic core.
+- `relationship_analyzer.py`: Simplified backward search to find related/correction targets based strictly on date sequence and type.
+
+## Dependencies
+Python version: >=3.10
+Runtime dependencies:
+- requests>=2.31.0 (HTTP communication)
+- pydantic>=2.5.0 (Strict data models, validation)
+- typing-extensions>=4.8.0 (Typing support)
+Development dependencies:
+- pytest>=7.4.0
+- mypy>=1.7.0
+- black>=23.11.0
+- ruff>=0.1.6
+
+## Files created
+- `pyproject.toml`
+- `README.md`
+- `src/kap_yorum/http_utils.py`
+- `tests/test_r1_core.py`
+
+## Files modified
+- `src/kap_yorum/models.py`
+- `src/kap_yorum/engine.py`
+- `src/kap_yorum/kap_client.py`
+- `src/kap_yorum/resolver.py`
+
+## Architecture introduced
+- **System Readiness Model (`SystemReadiness`, `CapabilityStatus`)**: Enforces isolation and prevents prototypical analysis logic from executing if the required base capabilities (like ticker resolution or disclosure retrieval) are not officially marked as READY.
+- **Source State Metadata (`SourceStatus`, `RequestMetadata`)**: Typed tracking of request outcomes to separate network faults (UNAVAILABLE) from actual empty periods (EMPTY_CONFIRMED).
+- **Error Taxonomy (`ErrorCategory`)**: Enumerated network fault types replacing raw exceptions.
+- **Retry/Timeout Boundary (`http_utils.py`)**: Deterministic HTTP execution wrapper limiting retries to `MAX_RETRIES` (2) and enforcing explicit timeout bounds.
+- **Temporal & Identity Integrity**: Introduction of `DisclosureIdentity` for deduplication logic, and `get_now_tz()` for timezone-aware temporal logic.
+
+## Tests added
+Replaced some early weak client/engine tests with comprehensive R1 foundation tests in `test_r1_core.py`:
+- `test_engine_fail_closed_readiness`
+- `test_engine_readiness_override`
+- `test_kap_client_success`
+- `test_kap_client_empty_confirmed`
+- `test_kap_client_unavailable_timeout`
+- `test_kap_client_unavailable_connection_error`
+- `test_kap_client_invalid_response_schema`
+- `test_kap_client_identity_deduplication`
+- `test_temporal_timezone_awareness`
+
+## Test results
+- unit: 32 passed
+- regression: (Included in the 32 passing tests)
+- type-check: Clean (mypy strictly passed)
+- lint: Clean (ruff checked, unused imports fixed, E501s ignored per design choice)
+- format: (using ruff format/black internally applied where possible)
+
+## Readiness
+- ticker_resolution: NOT_READY
+- disclosure_listing: NOT_READY
+- disclosure_detail: NOT_READY
+- structured_fields: NOT_READY
+- attachments: NOT_READY
+- financial_context: NOT_READY
+- semantic_analysis: NOT_READY
+- economic_analysis: NOT_READY
+
+## Known issues
+None blocking R1. Existing heuristic modules remain untouched but are isolated by the fail-closed Readiness Gate. E501 line-length warnings remain but do not impact code integrity.
+
+## Scope violations
+NO
+
+## Gate
+PASS

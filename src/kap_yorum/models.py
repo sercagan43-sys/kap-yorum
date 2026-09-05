@@ -1,8 +1,79 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from datetime import datetime, timezone
 from enum import Enum
-from datetime import datetime
+from typing import List, Optional
 
+from pydantic import BaseModel, Field
+
+
+class SourceStatus(str, Enum):
+    SUCCESS = "SUCCESS"
+    EMPTY_CONFIRMED = "EMPTY_CONFIRMED"
+    PARTIAL = "PARTIAL"
+    UNAVAILABLE = "UNAVAILABLE"
+    INVALID_RESPONSE = "INVALID_RESPONSE"
+
+class ErrorCategory(str, Enum):
+    TIMEOUT = "TIMEOUT"
+    CONNECTION_FAILURE = "CONNECTION_FAILURE"
+    HTTP_ERROR = "HTTP_ERROR"
+    MALFORMED_RESPONSE = "MALFORMED_RESPONSE"
+    SCHEMA_MISMATCH = "SCHEMA_MISMATCH"
+    AUTH_ERROR = "AUTH_ERROR"
+    RATE_LIMIT = "RATE_LIMIT"
+    PARTIAL_CHILD_FAILURE = "PARTIAL_CHILD_FAILURE"
+    INVALID_IDENTIFIER = "INVALID_IDENTIFIER"
+    NONE = "NONE"
+
+class RequestMetadata(BaseModel):
+    source_name: str
+    operation_name: str
+    start_time: datetime
+    duration_ms: int = 0
+    status: SourceStatus
+    records_fetched: int = 0
+    records_failed: int = 0
+    error_category: ErrorCategory = ErrorCategory.NONE
+    retry_count: int = 0
+    raw_error_message: Optional[str] = None
+
+class CapabilityStatus(str, Enum):
+    READY = "READY"
+    NOT_READY = "NOT_READY"
+
+class SystemReadiness(BaseModel):
+    ticker_resolution: CapabilityStatus = CapabilityStatus.NOT_READY
+    disclosure_listing: CapabilityStatus = CapabilityStatus.NOT_READY
+    disclosure_detail: CapabilityStatus = CapabilityStatus.NOT_READY
+    structured_fields: CapabilityStatus = CapabilityStatus.NOT_READY
+    attachments: CapabilityStatus = CapabilityStatus.NOT_READY
+    financial_context: CapabilityStatus = CapabilityStatus.NOT_READY
+    semantic_analysis: CapabilityStatus = CapabilityStatus.NOT_READY
+    economic_analysis: CapabilityStatus = CapabilityStatus.NOT_READY
+
+    @property
+    def source_layer_validated(self) -> bool:
+        return (
+            self.ticker_resolution == CapabilityStatus.READY and
+            self.disclosure_listing == CapabilityStatus.READY and
+            self.disclosure_detail == CapabilityStatus.READY
+        )
+
+# Timezone-aware date generator
+def get_now_tz() -> datetime:
+    return datetime.now(timezone.utc)
+
+# Identity contract
+class DisclosureIdentity(BaseModel):
+    canonical_id: str
+    source_system: str = "KAP"
+
+    def validate_id(self) -> bool:
+        return bool(self.canonical_id and self.canonical_id.strip())
+
+class DisclosureIdentityError(Exception):
+    pass
+
+# We redefine or augment the previous models to ensure timezone awareness
 class QuestionStatus(str, Enum):
     ANSWERED = "ANSWERED"
     NOT_APPLICABLE = "NOT_APPLICABLE"
@@ -21,13 +92,12 @@ class Company(BaseModel):
 
 class Disclosure(BaseModel):
     disclosure_index: str
-    publish_date: datetime
+    publish_date: datetime # Must be tz-aware
     title: str
     content: Optional[str] = None
     url: Optional[str] = None
     is_correction: bool = False
 
-    # Analysis outputs
     importance: DisclosureImportance = DisclosureImportance.LOW_ECONOMIC_VALUE
     verified_facts: List[str] = Field(default_factory=list)
     semantic_core: Optional[str] = None

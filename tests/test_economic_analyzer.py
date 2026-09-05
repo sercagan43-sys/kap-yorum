@@ -1,6 +1,6 @@
-import pytest
-from kap_yorum.models import Disclosure, DisclosureImportance, QuestionStatus, EconomicQuestion
 from kap_yorum.economic_analyzer import EconomicAnalyzer
+from kap_yorum.models import Disclosure, DisclosureImportance, EconomicQuestion, QuestionStatus
+
 
 def test_analyze_low_value():
     d = Disclosure(

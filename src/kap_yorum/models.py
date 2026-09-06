@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -73,11 +73,11 @@ class RequestMetadata(BaseModel):
 
         elif status == SourceStatus.PARTIAL:
             if self.records_fetched == 0:
-                raise ValueError(f"Status PARTIAL must have > 0 fetched records")
+                raise ValueError("Status PARTIAL must have > 0 fetched records")
             if self.records_failed == 0:
-                raise ValueError(f"Status PARTIAL must have > 0 failed records")
+                raise ValueError("Status PARTIAL must have > 0 failed records")
             if error_category == ErrorCategory.NONE:
-                raise ValueError(f"Status PARTIAL must not have ErrorCategory.NONE")
+                raise ValueError("Status PARTIAL must not have ErrorCategory.NONE")
 
         return self
 
@@ -138,10 +138,43 @@ class DisclosureImportance(str, Enum):
     LOW_ECONOMIC_VALUE = "LOW_ECONOMIC_VALUE"
 
 
+
+class ResolutionState(str, Enum):
+    RESOLVED = "RESOLVED"
+    NOT_FOUND = "NOT_FOUND"
+    SOURCE_UNAVAILABLE = "SOURCE_UNAVAILABLE"
+    INVALID_RESPONSE = "INVALID_RESPONSE"
+    IDENTITY_CONFLICT = "IDENTITY_CONFLICT"
+
+class EntityType(str, Enum):
+    EQUITY_ISSUER = "EQUITY_ISSUER"
+    FUND = "FUND"
+    PORTFOLIO_MANAGER = "PORTFOLIO_MANAGER"
+    BROKERAGE = "BROKERAGE"
+    OTHER = "OTHER"
+    UNKNOWN = "UNKNOWN"
+
+class CompanyState(str, Enum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+    TERMINATED = "TERMINATED"
+    UNKNOWN = "UNKNOWN"
+
+class TickerResolutionResult(BaseModel):
+    state: ResolutionState
+    company: Optional['Company'] = None
+    error_message: Optional[str] = None
+    source_provenance: str = "KAP_PUBLIC"
+
 class Company(BaseModel):
     ticker: str
     name: str
     member_oid: Optional[str] = None
+    canonical_identity: Optional[str] = None
+    entity_type: EntityType = EntityType.UNKNOWN
+    state: CompanyState = CompanyState.UNKNOWN
+    source_provenance: str = "KAP_PUBLIC"
+
 
 
 class Disclosure(BaseModel):

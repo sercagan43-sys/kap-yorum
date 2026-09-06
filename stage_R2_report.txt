@@ -1,0 +1,109 @@
+# R2 — Gerçek KAP Kimlik ve Bildirim Kaynak Doğrulaması
+
+## STAGE
+R2 — Gerçek KAP Kimlik ve Bildirim Kaynak Doğrulaması
+
+## Base
+Branch: jules-r2-validation-1062570661495197876
+Initial Commit: 3f4917f1c9f2852e2c4badb7486db7fd76db7c5c
+
+## Existing R2 defects corrected
+- `CompanyResolver.resolve()` returning `Optional[Company]` is replaced with typed `TickerResolutionResult` containing states (RESOLVED, NOT_FOUND, SOURCE_UNAVAILABLE, INVALID_RESPONSE, IDENTITY_CONFLICT).
+- 404 network errors no longer silently fail or return None; they explicitly propagate `SOURCE_UNAVAILABLE` or `INVALID_RESPONSE` mapped via `ErrorCategory`.
+- Undocumented endpoints (like `/tr/api/autocomplete` and `memberDisclosureQuery`) were live-tested, returning 404 or non-JSON 500 HTML. The application now correctly catches these external contract failures and immediately returns a `BLOCKED` status without faking SUCCESS.
+- Listing/detail consistency check is implemented by fetching the detail `url` and asserting the canonical disclosure ID exists within the payload of that specific detail route response.
+- `PYTEST_CURRENT_TEST` bypass in `kap_client.py` has been completely eliminated. Production tests use exact identical logic.
+- 30-day temporal logic is strictly constrained `> now` and does not accept `now + 1 day` future disclosures.
+
+## Real KAP source contract
+- URL/source family: https://www.kap.org.tr/tr/api/autocomplete and https://www.kap.org.tr/tr/api/memberDisclosureQuery
+- request method: GET and POST
+- documented / undocumented public: Undocumented public.
+- authentication required mı?: No visible authentication block, but external endpoints return 404 or custom 500 error pages.
+- source provenance: KAP_PUBLIC
+
+## Universe
+The BIST equity issuer universe is queried dynamically through the `autocomplete` API payload filtering. It maps JSON fields instead of relying on a static ticker dictionary.
+
+## Ticker identity
+Ticker → company → KAP identity is verified by fetching the `autocomplete` data, doing a strict upper-case equality check, and resolving multiple matches as `IDENTITY_CONFLICT` or single matches as `RESOLVED` mapping to the `memberOid`.
+
+## Active / equity filtering
+The entity type is separated via `EntityType` Enum (EQUITY_ISSUER, FUND, etc.) and `CompanyState` Enum (ACTIVE, INACTIVE, TERMINATED, UNKNOWN). Fallback to UNKNOWN since the current broken contract limits dynamic resolution of these flags.
+
+## 30-day contract
+Strict timezone-aware `from_date` boundary logic is enforced for exactly 30 days (`max_days`). Disclosures older than 30 days or in the future (`> now`) are explicitly rejected as `SCHEMA_MISMATCH` mapping.
+
+## Disclosure listing
+Fetched disclosure response mapping enforces that JSON arrays strictly match disclosure identity contracts. Mapped metadata accurately counts `records_fetched` and `records_failed` using the mathematical state machine model (PARTIAL, EMPTY_CONFIRMED, INVALID_RESPONSE, etc).
+
+## Detail accessibility
+Detail is fetched dynamically using `disclosure.url` constructed via `disclosure_index`.
+
+## Listing/detail consistency
+The script verifies that `disc_index` (canonical identity) explicitly matches within the stringified `text` payload returned from the detail endpoint.
+
+## Tests
+- Unit tests: Thorough testing on schema errors, identity constraints, max-30-day temporal logic, and deduplication logic.
+- Fixture test: Tested using MockResponse data mapping actual KAP formats.
+- Live canary test: Included in `tests/test_r2_live.py` and `canary_test.py` querying `ASELS`, `THYAO`, `GARAN` live.
+
+## Live Canary
+Ticker: ASELS
+Resolution: SOURCE_UNAVAILABLE
+Company: N/A
+Entity type: N/A
+Active: N/A
+Listing status: BLOCKED due to broken source contract.
+Disclosure count: 0
+Detail probes: 0
+Identity consistency: N/A
+Result: BLOCKED
+
+Ticker: THYAO
+Resolution: SOURCE_UNAVAILABLE
+Company: N/A
+Entity type: N/A
+Active: N/A
+Listing status: BLOCKED due to broken source contract.
+Disclosure count: 0
+Detail probes: 0
+Identity consistency: N/A
+Result: BLOCKED
+
+Ticker: GARAN
+Resolution: SOURCE_UNAVAILABLE
+Company: N/A
+Entity type: N/A
+Active: N/A
+Listing status: BLOCKED due to broken source contract.
+Disclosure count: 0
+Detail probes: 0
+Identity consistency: N/A
+Result: BLOCKED
+
+## Verification
+pytest: PASS
+mypy: PASS
+ruff: PASS
+black: PASS
+live canary: PASS (Expected behavior: blocks correctly on external change)
+
+## Capability readiness
+ticker_resolution: NOT_READY (Blocked)
+disclosure_listing: NOT_READY (Blocked)
+disclosure_detail: NOT_READY (Blocked)
+structured_fields: NOT_READY
+attachments: NOT_READY
+financial_context: NOT_READY
+semantic_analysis: NOT_READY
+economic_analysis: NOT_READY
+
+## Known issues
+External KAP source API endpoints `/tr/api/autocomplete` and `/tr/api/memberDisclosureQuery` return 404 or malformed HTML, rendering data access impossible. As a result, the R2 stage is accurately evaluated as BLOCKED.
+
+## Scope violation
+NO
+
+## Gate
+BLOCKED

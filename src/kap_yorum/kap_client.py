@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, List, Optional, Set, Tuple
 
 import requests
@@ -18,7 +18,7 @@ from kap_yorum.models import (
 class KAPClient:
     """
     Fetches disclosures for a given company from KAP within a maximum 30-day window.
-    Implements R1 integrity checks.
+    Implements R1 integrity checks and R2 validations.
     """
 
     KAP_DISCLOSURE_LIST_URL = "https://www.kap.org.tr/tr/api/memberDisclosureQuery"
@@ -51,12 +51,16 @@ class KAPClient:
                 error_category=ErrorCategory.INVALID_IDENTIFIER
             )
 
-        # We will mock the date constraints for prototype, but strictly use tz-aware
         now = get_now_tz()
+        if max_days > 30:
+            max_days = 30
 
-        # A payload mock. Time logic is mostly for R2, R1 validates structure.
+        from_date = now - timedelta(days=max_days)
+
         payload = {
             "mkkMemberOidList": [company.member_oid],
+            "fromDate": from_date.strftime("%Y-%m-%d"),
+            "toDate": now.strftime("%Y-%m-%d"),
         }
 
         response, retries, error = execute_with_retry(
@@ -85,12 +89,14 @@ class KAPClient:
         try:
             data = response.json()
         except Exception as e:
+            raw_txt = getattr(response, 'text', '')
+            raw_err = f"BLOCKED: Exact external reason: JSON decoding failed. Response text snippet: {raw_txt[:200]}... Exception: {str(e)}"
             return [], create_metadata(
                 status=SourceStatus.INVALID_RESPONSE,
                 error_category=ErrorCategory.MALFORMED_RESPONSE,
                 duration_ms=duration_ms,
                 retry_count=retries,
-                raw_error_message=str(e)
+                raw_error_message=raw_err
             )
 
         if not isinstance(data, list):
@@ -116,7 +122,6 @@ class KAPClient:
         for item in data:
             disc_index = str(item.get("disclosureIndex", "")).strip()
 
-            # Duplicate / Identity Integrity Check
             identity = DisclosureIdentity(canonical_id=disc_index)
             if not identity.validate_id():
                 partial_failures += 1
@@ -130,12 +135,10 @@ class KAPClient:
 
             seen_ids.add(disc_index)
 
-            # Temporal Integrity Check
             publish_date_raw = item.get("publishDate")
             publish_date = None
 
             if isinstance(publish_date_raw, (int, float)):
-                # Assuming it's ms timestamp, we enforce UTC
                 try:
                     publish_date = datetime.fromtimestamp(
                         publish_date_raw / 1000.0, get_now_tz().tzinfo
@@ -144,6 +147,11 @@ class KAPClient:
                     pass
 
             if publish_date is None:
+                partial_failures += 1
+                error_types.add(ErrorCategory.SCHEMA_MISMATCH)
+                continue
+
+            if publish_date < from_date or publish_date > now:
                 partial_failures += 1
                 error_types.add(ErrorCategory.SCHEMA_MISMATCH)
                 continue
@@ -160,8 +168,24 @@ class KAPClient:
                 error_types.add(ErrorCategory.SCHEMA_MISMATCH)
                 continue
 
-            # R1 Note: Detail fetching is mocked/skipped for integrity checks unless required
-            # self._fetch_content(disclosure) # Removed from core loop to enforce readiness isolation
+            # R2 Detail accessibility & consistency validation
+            detail_url = disclosure.url
+            try:
+                detail_resp = self.http_client.get(detail_url, timeout=10.0)
+                if detail_resp.status_code != 200:
+                    partial_failures += 1
+                    error_types.add(ErrorCategory.HTTP_ERROR)
+                    continue
+                # Verifying listing/detail identity consistency by looking for the ID in the response text/headers
+                detail_text = getattr(detail_resp, 'text', '')
+                if not detail_text or disc_index not in detail_text:
+                    partial_failures += 1
+                    error_types.add(ErrorCategory.INVALID_IDENTIFIER)
+                    continue
+            except Exception:
+                partial_failures += 1
+                error_types.add(ErrorCategory.CONNECTION_FAILURE)
+                continue
 
             disclosures.append(disclosure)
 

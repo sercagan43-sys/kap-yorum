@@ -14,9 +14,10 @@ from kap_yorum.models import (
 
 
 class MockResponse:
-    def __init__(self, json_data, status_code=200):
+    def __init__(self, json_data, status_code=200, text=None):
         self.json_data = json_data
         self.status_code = status_code
+        self.text = str(json_data) if text is None else text
 
     def json(self):
         return self.json_data
@@ -47,7 +48,8 @@ class MockHttpClient:
     def get(self, url, **kwargs):
         if self.get_data is not None:
             return MockResponse(self.get_data)
-        return MockResponse([])
+        # Mocking detail check: URL should contain the disclosure index, just return URL so index is matched.
+        return MockResponse([], text=url)
 
 
 # --- Readiness Tests ---

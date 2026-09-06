@@ -138,10 +138,43 @@ class DisclosureImportance(str, Enum):
     LOW_ECONOMIC_VALUE = "LOW_ECONOMIC_VALUE"
 
 
+
+class ResolutionState(str, Enum):
+    RESOLVED = "RESOLVED"
+    NOT_FOUND = "NOT_FOUND"
+    SOURCE_UNAVAILABLE = "SOURCE_UNAVAILABLE"
+    INVALID_RESPONSE = "INVALID_RESPONSE"
+    IDENTITY_CONFLICT = "IDENTITY_CONFLICT"
+
+class EntityType(str, Enum):
+    EQUITY_ISSUER = "EQUITY_ISSUER"
+    FUND = "FUND"
+    PORTFOLIO_MANAGER = "PORTFOLIO_MANAGER"
+    BROKERAGE = "BROKERAGE"
+    OTHER = "OTHER"
+    UNKNOWN = "UNKNOWN"
+
+class CompanyState(str, Enum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+    TERMINATED = "TERMINATED"
+    UNKNOWN = "UNKNOWN"
+
+class TickerResolutionResult(BaseModel):
+    state: ResolutionState
+    company: Optional['Company'] = None
+    error_message: Optional[str] = None
+    source_provenance: str = "KAP_PUBLIC"
+
 class Company(BaseModel):
     ticker: str
     name: str
     member_oid: Optional[str] = None
+    canonical_identity: Optional[str] = None
+    entity_type: EntityType = EntityType.UNKNOWN
+    state: CompanyState = CompanyState.UNKNOWN
+    source_provenance: str = "KAP_PUBLIC"
+
 
 
 class Disclosure(BaseModel):

@@ -48,9 +48,10 @@ class KAPYorumEngine:
             )
 
         # 1. Ticker Validation & Company Resolution
-        company = self.resolver.resolve(ticker)
-        if not company:
-            return f"Hata: '{ticker}' kodlu şirket bulunamadı veya geçerli bir BIST kodu değil."
+        res_result = self.resolver.resolve(ticker)
+        if res_result.state != "RESOLVED" or not res_result.company:
+            return f"Hata: '{ticker}' kodlu şirket bulunamadı veya çözülemedi. (Durum: {res_result.state.value} - {res_result.error_message})"
+        company = res_result.company
 
         # 2. Maximum 30-day disclosure retrieval & content (Client handles network faults via typed metadata)
         disclosures, metadata = self.kap_client.get_disclosures(company, max_days=30)

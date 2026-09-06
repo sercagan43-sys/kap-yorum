@@ -25,6 +25,11 @@ class CompanyResolver:
 
         try:
             response = self.http_client.get(self.KAP_AUTOCOMPLETE_URL, timeout=10)
+
+            # Immediately block if external contract is broken
+            if response.status_code == 404:
+                raise RuntimeError("BLOCKED: KAP API autocomplete endpoint returned 404, contract changed.")
+
             response.raise_for_status()
             data = response.json()
 
@@ -36,5 +41,7 @@ class CompanyResolver:
                         member_oid=item.get("memberOid"),
                     )
             return None
+        except RuntimeError as e:
+            raise e
         except Exception:
             return None

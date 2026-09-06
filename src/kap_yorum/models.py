@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -73,11 +73,11 @@ class RequestMetadata(BaseModel):
 
         elif status == SourceStatus.PARTIAL:
             if self.records_fetched == 0:
-                raise ValueError(f"Status PARTIAL must have > 0 fetched records")
+                raise ValueError("Status PARTIAL must have > 0 fetched records")
             if self.records_failed == 0:
-                raise ValueError(f"Status PARTIAL must have > 0 failed records")
+                raise ValueError("Status PARTIAL must have > 0 failed records")
             if error_category == ErrorCategory.NONE:
-                raise ValueError(f"Status PARTIAL must not have ErrorCategory.NONE")
+                raise ValueError("Status PARTIAL must not have ErrorCategory.NONE")
 
         return self
 
